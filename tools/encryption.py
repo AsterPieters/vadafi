@@ -63,7 +63,7 @@ def decrypt_secret(master_secret, secret_data):
     iv = base64.b64decode(decoded_secret_data['iv'])
     secret = base64.b64decode(decoded_secret_data['secret'])
 
-    # Key derivation key    
+    # Key derivation function 
     kdf = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
         length=32,
@@ -82,6 +82,47 @@ def decrypt_secret(master_secret, secret_data):
 
     return plain_text_secret
 
+
+
+def hash_password(password):
+    """
+    Hashes the password.
+
+    Args:
+        password (str): A password.
+    
+    Returns:
+        json_hashed_password (JSON): A dictionary with the salt and hashed_password.    
+    """
+
+    # Generate a random salt
+    salt = os.urandom(16)
+
+    # Key derivation function
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100_000,
+        backend=default_backend()
+    )
+
+    # Hash the password
+    password_hash = kdf.derive(password.encode())
+
+    # Put the values in a dictionary
+    hashed_password = {
+        "salt": base64.b64encode(salt).decode('utf-8'),
+        "password_hash": base64.b64encode(password_hash).decode('utf-8')
+    }
+
+    # Convert to json
+    json_hashed_password = json.dumps(hashed_password)
+
+    return json_hashed_password
+
+
+
 if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Encrypt or decrypt secrets using a master secret.")
@@ -89,7 +130,7 @@ if __name__ == "__main__":
     parser.add_argument("master_secret", help="The password to use for encryption or decryption.")
     
     parser.add_argument("plain_text_secret", help="The secret to be encrypted")
-    parser.add_argument("secret_data", help="The secret to be decrypted")
+    parser.add_argument("secret_data", help="The secret to be decrypted", nargs='?', default=None)
     
     args = parser.parse_args()
 

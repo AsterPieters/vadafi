@@ -1,0 +1,12 @@
+# Documentation 
+
+# What should vadafi have?
+
+A feature to add passwords
+A feature to edit/delete passwords
+
+A feature to en/de -crypt passwords
+
+A ui
+
+

@@ -1,0 +1,6 @@
+# requirements.py
+
+Flask==2.3.2
+cryptography
+psycopg2
+python-dotenv

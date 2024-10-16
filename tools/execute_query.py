@@ -8,14 +8,15 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 
-def execute_query(query, return_data=False):
+def execute_query(query, return_data=False, params=False):
     """
     Executes a query on the Postgres database.
 
     Args:
         query (str): The query to execute.
         return_data (bool): Should the query return data.
-    
+        params (str): Parameters for the query, we use this to counter SQL injection.
+
     Returns:
         list: Returns data if return_data is True.
 
@@ -24,7 +25,7 @@ def execute_query(query, return_data=False):
     """
 
     # Load database credentails
-    env_path = Path(f'./.env_vadafi')
+    env_path = Path('.env')
     load_dotenv(env_path)
 
     # Get the database credentials out of the env variables
@@ -46,7 +47,7 @@ def execute_query(query, return_data=False):
         cursor = connection.cursor()
 
         # Execute the query
-        cursor.execute(query)
+        cursor.execute(query, params)
 
         # Fetch data if needed
         if return_data:

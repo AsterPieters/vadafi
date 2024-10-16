@@ -3,11 +3,11 @@
 services:
   postgres:
     image: postgres:15
-    container_name: postgres_database
+    container_name: vadafi-postgres
     environment:
-      POSTGRES_USER: admin
+      POSTGRES_USER: vadafi-admin
       POSTGRES_PASSWORD: admin
-      POSTGRES_DB: admin
+      POSTGRES_DB: vadafi
     ports:
       - "5432:5432"
     volumes:
