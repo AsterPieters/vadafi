@@ -15,7 +15,6 @@ def execute_query(query, return_data=False):
     Args:
         query (str): The query to execute.
         return_data (bool): Should the query return data.
-        database (str): Database to run query on.
     
     Returns:
         list: Returns data if return_data is True.
@@ -69,15 +68,3 @@ def execute_query(query, return_data=False):
     
     # Return data or empty list
     return results
-
-
-
-if __name__ == "__main__":
-    try:
-        # Example query to fetch data
-        query = "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';"
-        data = execute_query(query, return_data=True)
-        print("Query Results:", data)
-
-    except Exception as e:
-        print(f"An error occurred: {e}")
