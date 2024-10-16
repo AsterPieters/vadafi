@@ -11,8 +11,17 @@ import json
 import os
 
 def encrypt_secret(master_secret, plain_text_secret):
-    """ Encrypt secrets using the master secret and return them in a json string """
+    """
+    Encrypt a plain text secret using the master password.
+
+    Args:
+        master_secret (str): The master secret.
+        plain_text_secret (str): The to be encrypted secret in plain text.
     
+    Returns:
+        secret_data (dict): A dictionary with the salt, iv and encrypted secret.
+    """
+
     # Generate a random salt
     salt = os.urandom(16)
 
@@ -34,34 +43,40 @@ def encrypt_secret(master_secret, plain_text_secret):
     iv = os.urandom(12)
     
     # Encrypt the secret
+    # The plain_text_secret should be encoded to be sure
     aesgcm = AESGCM(encryption_key)
     encrypted_secret = aesgcm.encrypt(iv, plain_text_secret.encode(), None)
 
     # Put all values in a dictionary
-    # We decode the values in order to properly store them
+    # We encode the values for easier storage
     secret_data = {
         "salt": base64.b64encode(salt).decode('utf-8'),
         "iv": base64.b64encode(iv).decode('utf-8'),
         "secret": base64.b64encode(encrypted_secret).decode('utf-8')
     }
 
-    # Convert to JSON
-    json_secret_data = json.dumps(secret_data)
-    
-    return json_secret_data
+    return json.dumps(secret_data)
 
 
 
 def decrypt_secret(master_secret, secret_data):
-    """ Decrypt secrets using the master secret """
+    """
+    Decrypt a secret using the master secret.
 
-    # Load the JSON string
-    decoded_secret_data = json.loads(secret_data)
+    Args:
+        master_secret (str): The master secret.
+        secret_data (dict): A dictionary with the salt, iv and encrypted secret.
+    
+    Returns:
+        plain_text_secret (str): the plain_text_secret.
+    """
+
+    secret_data = json.loads(secret_data)
 
     # Grab the data out of the dictionary
-    salt = base64.b64decode(decoded_secret_data["salt"])
-    iv = base64.b64decode(decoded_secret_data['iv'])
-    secret = base64.b64decode(decoded_secret_data['secret'])
+    salt = base64.b64decode(secret_data['salt'])
+    iv = base64.b64decode(secret_data['iv'])
+    secret = base64.b64decode(secret_data['secret'])
 
     # Key derivation function 
     kdf = PBKDF2HMAC(
@@ -125,13 +140,25 @@ def hash_password(password):
 
 if __name__ == "__main__":
     
+    # Initiate result
+    result = None
+    
     parser = argparse.ArgumentParser(description="Encrypt or decrypt secrets using a master secret.")
-    parser.add_argument("action", choices=["encrypt", "decrypt"], help="Specify whether to encrypt or decrypt the secret.")
-    parser.add_argument("master_secret", help="The password to use for encryption or decryption.")
+  
+    # Subparser for action
+    subparsers = parser.add_subparsers(dest="action", required=True, help="Specify action to perform.")
+
+    # Subparser for encrypt
+    encrypt_parser = subparsers.add_parser("encrypt", help="Encrypt a secret.")
+    encrypt_parser.add_argument("master_secret", help="The password to use for encryption or decryption.")
+    encrypt_parser.add_argument("plain_text_secret", help="The secret to be encrypted.")
     
-    parser.add_argument("plain_text_secret", help="The secret to be encrypted")
-    parser.add_argument("secret_data", help="The secret to be decrypted", nargs='?', default=None)
+    # Subparser for decrypt
+    decrypt_parser = subparsers.add_parser("decrypt", help="Decrypt a secret.")
+    decrypt_parser.add_argument("master_secret", help="The password to use for encryption or decryption.")
+    decrypt_parser.add_argument("secret_data", help="Dictionary with salt, iv and password.")
     
+    # Now parse all arguments
     args = parser.parse_args()
 
     # Encrypt the secret
