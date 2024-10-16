@@ -4,18 +4,20 @@ import re
 import base64
 import json
 import argparse
+import psycopg2
 
-from tools.encryption import hash_password
+from tools.encryption import hash_secret
+from tools.execute_query import execute_query
 
 def check_username_validity(username):
     return re.match("^[a-zA-Z0-9_]{1,30}$", username) is not None
 
-def create_user(user_name, master_secret):
+def create_user(username, master_secret):
     """
-    Creates a user, hashed the password, and stores the information in the database.
+    Creates a user, hashes the secret, and stores the information in the database.
 
     Args:
-        user_name (str): A unique username.
+        username (str): A unique username.
         master_secret (str): The users master_secret.
     
     Returns:
@@ -25,21 +27,45 @@ def create_user(user_name, master_secret):
         Exception: If creation was unsuccesful.
     """
 
-    if check_username_validity(user_name):
-        print("test")
+    # Check if username is valid
+    if check_username_validity(username):
+        pass
     else:
         raise ValueError ("Invalid username")
+    
+    # Create user row in vadafi-users
+    try:
+        # Hash the master secret
+        hashed_data = json.loads(hash_secret(master_secret))
+
+        # Create the query
+        query = """
+        INSERT INTO vadafi_users (username, master_secret_hash, salt)
+        VALUES (%s, %s, %s)
+        """
+
+        # Set the params
+        params = (username, hashed_data["secret_hash"], hashed_data["salt"])
+
+        # Create user in vadafi's database
+        execute_query(query, False, params)
+
+        # Create the user's database
+        execute_query(f"CREATE DATABASE {username}", autocommit=True)
+
+        # Create user in postgres
+        execute_query(f"CREATE USER {username} WITH PASSWORD '{master_secret}';")
+
+        # Grant privileges to user for user's database
+        execute_query(f"GRANT ALL PRIVILEGES ON DATABASE {username} TO {username};")
+
+    except psycopg2.errors.UniqueViolation:
+        print(f"User with username {username} already exists.")
+
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
 
 
-    # Hash the password and load json
-    json_hashed_password = hash_password(master_secret)
-    hashed_password = json.loads(json_hashed_password)
-
-    # Decode the values
-    salt = base64.b64decode(hashed_password["salt"]).decode('utf-8')
-    password_hash = base64.b64decode(hashed_password["password_hash"]).decode('utf-8')
-
-    return salt, password_hash
 
 
 
@@ -47,7 +73,7 @@ if __name__ == "__main__":
     
     parser = argparse.ArgumentParser(description="Manage users.")
     parser.add_argument("action", choices=["create", "remove"], help="Specify whether to create or remove a user.")
-    parser.add_argument("user_name", help="The username to manage.")
+    parser.add_argument("username", help="The username to manage.")
     
     parser.add_argument("master_secret", help="The master secret of the user.")
     
@@ -55,7 +81,7 @@ if __name__ == "__main__":
 
     # Encrypt the secret
     if args.action == "create":
-        result = create_user(args.user_name, args.master_secret)
+        result = create_user(args.username, args.master_secret)
         
     # Print the final result
     print(result)

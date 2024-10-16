@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from pathlib import Path
 
 
-def execute_query(query, return_data=False, params=False):
+def execute_query(query, return_data=False, params=None, autocommit=False):
     """
     Executes a query on the Postgres database.
 
@@ -16,6 +16,7 @@ def execute_query(query, return_data=False, params=False):
         query (str): The query to execute.
         return_data (bool): Should the query return data.
         params (str): Parameters for the query, we use this to counter SQL injection.
+        autocommit (bool): Set the connection mode to autocommit.
 
     Returns:
         list: Returns data if return_data is True.
@@ -44,6 +45,12 @@ def execute_query(query, return_data=False, params=False):
     try:
         # Connect to the Database
         connection = psycopg2.connect(**db_config)
+        
+        # Enable autocommit if True
+        if autocommit:
+            connection.set_isolation_level(psycopg2.extensions.ISOLATION_LEVEL_AUTOCOMMIT)
+
+        # Initialize cursor
         cursor = connection.cursor()
 
         # Execute the query
@@ -54,7 +61,8 @@ def execute_query(query, return_data=False, params=False):
             results = cursor.fetchall()
 
         # Commit change
-        connection.commit()
+        if not autocommit:
+            connection.commit()
 
     except (OperationalError, DatabaseError) as e:
         print(f"Database error: {e}")
@@ -68,4 +76,5 @@ def execute_query(query, return_data=False, params=False):
             connection.close()
     
     # Return data or empty list
-    return results
+    if return_data:
+        return results
