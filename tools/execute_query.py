@@ -1,11 +1,16 @@
 # execute_query.py
 
 import psycopg2
+import json
+import sys
 import os
 
-from psycopg2 import sql, OperationalError, DatabaseError
+from psycopg2 import OperationalError, DatabaseError
 from dotenv import load_dotenv
 from pathlib import Path
+from .logger import vadafi_logger
+
+logger = vadafi_logger()
 
 
 def execute_query(query, return_data=False, params=None, autocommit=False):
@@ -40,6 +45,7 @@ def execute_query(query, return_data=False, params=None, autocommit=False):
 
     # Initialize connection
     connection = None
+    cursor = None
     results = []
 
     try:
@@ -64,17 +70,22 @@ def execute_query(query, return_data=False, params=None, autocommit=False):
         if not autocommit:
             connection.commit()
 
-    except (OperationalError, DatabaseError) as e:
-        print(f"Database error: {e}")
-        raise
-    
+    # Except database issues
+    # We except other issues later
+    # Exit the program if the database has issues
+    except OperationalError as e:
+        logger.critical(f"Error occured executing query: {e}")
+        sys.exit()
+
     finally:
-        # Close the connection
-        if cursor:
+        
+        # Close the connection safely
+        if 'cursor' in locals() and cursor:
             cursor.close()
-        if connection:
-            connection.close()
-    
+        
+        if 'connection' in locals() and connection:
+            connection.close() 
+
     # Return data or empty list
     if return_data:
         return results

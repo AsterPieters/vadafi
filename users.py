@@ -9,6 +9,10 @@ import psycopg2
 from tools.encryption import hash_secret
 from tools.execute_query import execute_query
 
+from tools.logger import vadafi_logger
+
+logger = vadafi_logger()
+
 def check_username_validity(username):
     return re.match("^[a-zA-Z0-9_]{1,30}$", username) is not None
 
@@ -52,19 +56,21 @@ def create_user(username, master_secret):
 
         # Create the user's database
         execute_query(f"CREATE DATABASE {username}", autocommit=True)
+        logger.info(f"Created database {username}.")
 
         # Create user in postgres
         execute_query(f"CREATE USER {username} WITH PASSWORD '{master_secret}';")
+        logger.info(f"Created user {username}.")
 
         # Grant privileges to user for user's database
         execute_query(f"GRANT ALL PRIVILEGES ON DATABASE {username} TO {username};")
+        logger.info(f"Granted privileges on database {username} to {username}.")
 
     except psycopg2.errors.UniqueViolation:
-        print(f"User with username {username} already exists.")
+        logger.error(f"Username {username} is already taken.")
 
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
-
+        logger.error(f"Error occured while trying to create user: {e}")
 
 
 
@@ -82,6 +88,3 @@ if __name__ == "__main__":
     # Encrypt the secret
     if args.action == "create":
         result = create_user(args.username, args.master_secret)
-        
-    # Print the final result
-    print(result)
