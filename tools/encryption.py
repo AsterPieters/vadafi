@@ -99,15 +99,15 @@ def decrypt_secret(master_secret, secret_data):
 
 
 
-def hash_password(password):
+def hash_secret(secret):
     """
-    Hashes the password.
+    Hashes the secret.
 
     Args:
-        password (str): A password.
+        secret (str): A secret.
     
     Returns:
-        json_hashed_password (JSON): A dictionary with the salt and hashed_password.    
+        json_hashed_secret (JSON): A dictionary with the salt and hashed_secret.    
     """
 
     # Generate a random salt
@@ -122,19 +122,16 @@ def hash_password(password):
         backend=default_backend()
     )
 
-    # Hash the password
-    password_hash = kdf.derive(password.encode())
+    # Hash the secret
+    secret_hash = kdf.derive(secret.encode())
 
     # Put the values in a dictionary
-    hashed_password = {
+    hashed_data = {
         "salt": base64.b64encode(salt).decode('utf-8'),
-        "password_hash": base64.b64encode(password_hash).decode('utf-8')
+        "secret_hash": base64.b64encode(secret_hash).decode('utf-8')
     }
 
-    # Convert to json
-    json_hashed_password = json.dumps(hashed_password)
-
-    return json_hashed_password
+    return json.dumps(hashed_data)
 
 
 
