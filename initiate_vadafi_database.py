@@ -1,6 +1,9 @@
 # initiate_vadafi_database.py
 
+from tools.logger import vadafi_logger
 from tools.execute_query import execute_query
+
+logger = vadafi_logger()
 
 # Create user database
 query = """
@@ -12,5 +15,9 @@ query = """
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
     """
+try:
+    execute_query(query)
+    logger.info("Created table vadafi_users.")
 
-execute_query(query, False)
+except Exception as e:
+    logger.error(f"Error occured while trying to initiate vadafi database: {e}")

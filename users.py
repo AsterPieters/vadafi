@@ -1,13 +1,15 @@
 # users.py
 
 import re
-import base64
+import os
 import json
 import argparse
 import psycopg2
+from pathlib import Path
+from dotenv import load_dotenv
 
 from tools.encryption import hash_secret
-from tools.execute_query import execute_query
+from tools.execute_query import execute_query, execute_query
 
 from tools.logger import vadafi_logger
 
@@ -36,8 +38,18 @@ def create_user(username, master_secret):
         pass
     else:
         raise ValueError ("Invalid username")
-    
-    # Create user row in vadafi-users
+
+    # Create the vadafi admin credentials dict for query's on the user's database
+    env_path = Path('.env')
+    load_dotenv(env_path)
+    credentials = {
+    'dbname': username,
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
+    'host': os.getenv('DB_HOST'),
+    'port': os.getenv('DB_PORT')
+        }
+
     try:
         # Hash the master secret
         hashed_data = json.loads(hash_secret(master_secret))
@@ -51,28 +63,54 @@ def create_user(username, master_secret):
         # Set the params
         params = (username, hashed_data["secret_hash"], hashed_data["salt"])
 
-        # Create user in vadafi's database
+        # Add user to vadafi_users
         execute_query(query, False, params)
 
-        # Create the user's database
+        # Create database
         execute_query(f"CREATE DATABASE {username}", autocommit=True)
-        logger.info(f"Created database {username}.")
+        logger.info(f"Created database: {username}.")
 
-        # Create user in postgres
+        # Create user
         execute_query(f"CREATE USER {username} WITH PASSWORD '{master_secret}';")
-        logger.info(f"Created user {username}.")
+        logger.info(f"Created user: {username}.")
 
-        # Grant privileges to user for user's database
-        execute_query(f"GRANT ALL PRIVILEGES ON DATABASE {username} TO {username};")
-        logger.info(f"Granted privileges on database {username} to {username}.")
+        # Create secret table
+        query = """
+        CREATE TABLE secrets (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            name VARCHAR(255) NOT NULL,
+            description TEXT,
+            secret TEXT NOT NULL,
+            salt VARCHAR(255) NOT NULL,
+            iv VARCHAR(255) NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            status VARCHAR(50) DEFAULT 'active',
+            tags TEXT[]
+        );
+        """
+        execute_query(query, credentials=credentials)
+        logger.info(f"Created table 'secrets' on database {username}.")
+
+        # Configure the user's privileges
+        execute_query(f"ALTER DATABASE {username} OWNER TO {username};", credentials=credentials)
+        execute_query(f"ALTER SCHEMA public OWNER TO {username};", credentials=credentials)
+        execute_query(f"GRANT ALL PRIVILEGES ON SCHEMA public TO {username};", credentials=credentials)
+        execute_query(f"GRANT USAGE, CREATE ON SCHEMA public TO {username};", credentials=credentials)
+        execute_query(f"ALTER TABLE public.secrets OWNER TO {username};", credentials=credentials)
+        execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {username};", credentials=credentials)
+        execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO {username};", credentials=credentials)
+        execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO {username};", credentials=credentials)
+        logger.info(f"Configured privileges for {username} in database {username}.")
+
+        # Log the success
+        logger.info(f"Succesfully created user: {username}!")
 
     except psycopg2.errors.UniqueViolation:
         logger.error(f"Username {username} is already taken.")
 
     except Exception as e:
-        logger.error(f"Error occured while trying to create user: {e}")
-
-
+        logger.error(f"Error occured while trying to create user: {username} in vadafi database: {e}")
 
 
 if __name__ == "__main__":

@@ -1,27 +1,45 @@
 # execute_query.py
 
 import psycopg2
-import json
+from pathlib import Path
+from dotenv import load_dotenv
 import sys
 import os
 
+
 from psycopg2 import OperationalError, DatabaseError
-from dotenv import load_dotenv
-from pathlib import Path
 from .logger import vadafi_logger
 
 logger = vadafi_logger()
 
+def load_admin_credentials():
+    # Load database credentails into the env variables
+    env_path = Path('.env')
+    load_dotenv(env_path)
 
-def execute_query(query, return_data=False, params=None, autocommit=False):
+    # Get the database credentials out of the env variables
+    credentials = {
+        'dbname': os.getenv('DB_NAME'),
+        'user': os.getenv('DB_USER'),
+        'password': os.getenv('DB_PASSWORD'),
+        'host': os.getenv('DB_HOST'),
+        'port': os.getenv('DB_PORT'),
+            }
+
+    return credentials
+
+
+
+def execute_query(query, return_data=False, params=None, autocommit=False, credentials=None):
     """
-    Executes a query on the Postgres database.
+    Executes a query on the vadafi database.
 
     Args:
         query (str): The query to execute.
         return_data (bool): Should the query return data.
         params (str): Parameters for the query, we use this to counter SQL injection.
         autocommit (bool): Set the connection mode to autocommit.
+        credentials (dict): Database credentials.
 
     Returns:
         list: Returns data if return_data is True.
@@ -30,18 +48,9 @@ def execute_query(query, return_data=False, params=None, autocommit=False):
         Exception: If a database error occurs.
     """
 
-    # Load database credentails
-    env_path = Path('.env')
-    load_dotenv(env_path)
-
-    # Get the database credentials out of the env variables
-    db_config = {
-        'dbname': os.getenv('DB_NAME'),
-        'user': os.getenv('DB_USER'),
-        'password': os.getenv('DB_PASSWORD'),
-        'host': os.getenv('DB_HOST'),
-        'port': os.getenv('DB_PORT'),
-            }
+    # Load the admin creds if no provided
+    if not credentials:
+        credentials = load_admin_credentials()
 
     # Initialize connection
     connection = None
@@ -50,7 +59,7 @@ def execute_query(query, return_data=False, params=None, autocommit=False):
 
     try:
         # Connect to the Database
-        connection = psycopg2.connect(**db_config)
+        connection = psycopg2.connect(**credentials)
         
         # Enable autocommit if True
         if autocommit:
@@ -74,11 +83,13 @@ def execute_query(query, return_data=False, params=None, autocommit=False):
     # We except other issues later
     # Exit the program if the database has issues
     except OperationalError as e:
-        logger.critical(f"Error occured executing query: {e}")
+        logger.error(f"Operational error occured while executing query: {e}")
         sys.exit()
 
+    except DatabaseError as e:
+        logger.error(f"Database error occured while executing query: {e}")
+
     finally:
-        
         # Close the connection safely
         if 'cursor' in locals() and cursor:
             cursor.close()
@@ -89,3 +100,4 @@ def execute_query(query, return_data=False, params=None, autocommit=False):
     # Return data or empty list
     if return_data:
         return results
+
