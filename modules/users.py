@@ -8,15 +8,42 @@ import psycopg2
 from pathlib import Path
 from dotenv import load_dotenv
 
-from tools.encryption import hash_secret
-from tools.execute_query import execute_query, execute_query
-
-from tools.logger import vadafi_logger
+from .tools.encryption import hash_secret
+from .tools.execute_query import execute_query
+from .tools.logger import vadafi_logger
+from .tools.authentication import get_admin_dbconfig
 
 logger = vadafi_logger()
 
 def check_username_validity(username):
     return re.match("^[a-zA-Z0-9_]{1,30}$", username) is not None
+
+def get_user_id(username):
+    """
+    Get the unique identifier of a user.
+    """
+
+    # Get the dbconfig
+    dbconfig = get_admin_dbconfig()    
+
+    # Create the query
+    query="""
+    SELECT user_id FROM vadafi_users WHERE username = %s
+    """
+
+    # Get the user_id
+    result = execute_query(
+       query,
+       params=(username, ),
+       return_data=True,
+       dbconfig=dbconfig
+        )
+    if result:
+        return result[0][0]
+    else:
+        return None
+
+
 
 def create_user(username, master_secret):
     """
@@ -39,40 +66,49 @@ def create_user(username, master_secret):
     else:
         raise ValueError ("Invalid username")
 
-    # Create the vadafi admin credentials dict for query's on the user's database
-    env_path = Path('.env')
-    load_dotenv(env_path)
-    credentials = {
-    'dbname': username,
-    'user': os.getenv('DB_USER'),
-    'password': os.getenv('DB_PASSWORD'),
-    'host': os.getenv('DB_HOST'),
-    'port': os.getenv('DB_PORT')
-        }
-
     try:
-        # Hash the master secret
-        hashed_data = json.loads(hash_secret(master_secret))
+        # Get the dbconfig for the vadafi database
+        vadafi_dbconfig = get_admin_dbconfig()
 
-        # Create the query
-        query = """
+        # Hash the master secret
+        hashed_data = hash_secret(master_secret)
+
+        # Add user to vadafi_users
+        query="""
         INSERT INTO vadafi_users (username, master_secret_hash, salt)
         VALUES (%s, %s, %s)
         """
+        execute_query(
+            query,
+            params=(username, hashed_data["secret_hash"], hashed_data["salt"]),
+            dbconfig=vadafi_dbconfig
+            )
+        logger.info(f"Created user {username} in vadafi_users table.")
+    
+        # Name database & database_user based on user's unique identifier
+        user_id = get_user_id(username) 
+        db_name = f"db_{user_id}"
+        db_user_name = f"user_{user_id}"
 
-        # Set the params
-        params = (username, hashed_data["secret_hash"], hashed_data["salt"])
-
-        # Add user to vadafi_users
-        execute_query(query, False, params)
-
+        # Get the dbconfig for the user database
+        # This will also be as the admin
+        user_dbconfig = get_admin_dbconfig(db_name)
+        
         # Create database
-        execute_query(f"CREATE DATABASE {username}", autocommit=True)
-        logger.info(f"Created database: {username}.")
+        execute_query(
+            f"CREATE DATABASE {db_name}",
+            autocommit=True,
+            dbconfig=vadafi_dbconfig
+            )
+        logger.info(f"Created {db_name}.")
 
-        # Create user
-        execute_query(f"CREATE USER {username} WITH PASSWORD '{master_secret}';")
-        logger.info(f"Created user: {username}.")
+        # Create database user
+        execute_query(
+            f"CREATE USER {db_user_name} WITH PASSWORD %s",
+            params=(master_secret,),
+            dbconfig=vadafi_dbconfig
+            )
+        logger.info(f"Created {db_user_name}.")
 
         # Create secret table
         query = """
@@ -84,27 +120,30 @@ def create_user(username, master_secret):
             iv VARCHAR(255) NOT NULL
         );
         """
-        execute_query(query, credentials=credentials)
-        logger.info(f"Created table 'secrets' on database {username}.")
+        execute_query(
+                query, 
+                dbconfig=user_dbconfig
+                )
+        logger.info(f"Created table 'secrets' on {db_name}.")
 
         # Configure the user's privileges
-        execute_query(f"ALTER DATABASE {username} OWNER TO {username};", credentials=credentials)
-        execute_query(f"ALTER SCHEMA public OWNER TO {username};", credentials=credentials)
-        execute_query(f"GRANT ALL PRIVILEGES ON SCHEMA public TO {username};", credentials=credentials)
-        execute_query(f"GRANT USAGE, CREATE ON SCHEMA public TO {username};", credentials=credentials)
-        execute_query(f"ALTER TABLE public.secrets OWNER TO {username};", credentials=credentials)
-        execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {username};", credentials=credentials)
-        execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO {username};", credentials=credentials)
-        execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO {username};", credentials=credentials)
-        logger.info(f"Configured privileges for {username} in database {username}.")
+        execute_query(f"ALTER DATABASE {db_name} OWNER TO {db_user_name};", dbconfig=user_dbconfig)
+        execute_query(f"ALTER SCHEMA public OWNER TO {db_user_name};", dbconfig=user_dbconfig)
+        execute_query(f"GRANT ALL PRIVILEGES ON SCHEMA public TO {db_user_name};", dbconfig=user_dbconfig)
+        execute_query(f"GRANT USAGE, CREATE ON SCHEMA public TO {db_user_name};", dbconfig=user_dbconfig)
+        execute_query(f"ALTER TABLE public.secrets OWNER TO {db_user_name};", dbconfig=user_dbconfig)
+        execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {db_user_name};", dbconfig=user_dbconfig)
+        execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO {db_user_name};", dbconfig=user_dbconfig)
+        execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO {db_user_name};", dbconfig=user_dbconfig)
+        logger.info(f"Configured privileges for {db_user_name} in database {db_name}.")
 
         # Log the success
-        logger.info(f"Succesfully created user: {username}!")
+        logger.info(f"Succesfully created user {username}!")
 
     except psycopg2.errors.UniqueViolation:
         logger.error(f"Username {username} is already taken.")
 
     except Exception as e:
-        logger.error(f"Error occured while trying to create user: {username} in vadafi database: {e}")
+        logger.error(f"Error occured while trying to create user {username} in vadafi database {e}")
 
 

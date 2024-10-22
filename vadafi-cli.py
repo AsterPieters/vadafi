@@ -2,10 +2,10 @@
 
 import argparse
 
-from tools.encryption import encrypt_secret, decrypt_secret
-from secrets import add_secret
-from secrets import list_secrets
-from users import create_user
+from modules.tools.encryption import encrypt_secret, decrypt_secret
+from modules.secrets import add_secret
+from modules.secrets import list_secrets
+from modules.users import create_user
 
 # Initiate result
 result = None
@@ -67,5 +67,6 @@ if args.action == "list_secrets":
     result = list_secrets(args.username, args.master_secret)
 
 # Print the final result
-print(result)
+if result:
+    print(result)
 

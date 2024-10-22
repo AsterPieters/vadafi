@@ -73,7 +73,6 @@ def execute_query(query, return_data=False, params=None, autocommit=False, dbcon
 
     # Return data or empty list
     if return_data:
-        return results
-    
+        return results 
     else:
         return True

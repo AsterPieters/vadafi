@@ -112,7 +112,6 @@ def hash_secret(secret, salt=None):
 
     if not salt:
         # Generate a random salt
-        print("generating salt")
         salt = os.urandom(16)
 
     # Key derivation function

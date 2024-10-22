@@ -1,9 +1,9 @@
 # secrets.py
 
 
-from tools.encryption import encrypt_secret
-from tools.execute_query import execute_query
-from tools.logger import vadafi_logger
+from .tools.encryption import encrypt_secret
+from .tools.execute_query import execute_query
+from .tools.logger import vadafi_logger
 
 logger = vadafi_logger()
 
