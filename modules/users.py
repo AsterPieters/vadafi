@@ -108,16 +108,3 @@ def create_user(username, master_secret):
         logger.error(f"Error occured while trying to create user: {username} in vadafi database: {e}")
 
 
-if __name__ == "__main__":
-    
-    parser = argparse.ArgumentParser(description="Manage users.")
-    parser.add_argument("action", choices=["create", "remove"], help="Specify whether to create or remove a user.")
-    parser.add_argument("username", help="The username to manage.")
-    
-    parser.add_argument("master_secret", help="The master secret of the user.")
-    
-    args = parser.parse_args()
-
-    # Encrypt the secret
-    if args.action == "create":
-        result = create_user(args.username, args.master_secret)
