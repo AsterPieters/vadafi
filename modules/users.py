@@ -1,12 +1,9 @@
 # users.py
 
 import re
-import os
-import json
-import argparse
 import psycopg2
-from pathlib import Path
-from dotenv import load_dotenv
+from psycopg2.errors import QueryCanceled
+from flask import jsonify
 
 from .tools.encryption import hash_secret
 from .tools.execute_query import execute_query
@@ -17,6 +14,37 @@ logger = vadafi_logger()
 
 def check_username_validity(username):
     return re.match("^[a-zA-Z0-9_]{1,30}$", username) is not None
+
+
+
+def check_username_availability(username):
+    """
+    Check if username is available in the vadafi_users table.
+    """
+    try:
+        # Get the dbconfig
+        dbconfig = get_admin_dbconfig()
+
+        # Create the query
+        query = """
+        SELECT COUNT(*) FROM vadafi_users WHERE username = %s
+        """
+        result = execute_query(
+            query,
+            params=(username,),
+            return_data=True,
+            dbconfig=dbconfig
+            )
+        if result[0][0] == 0:
+            return True
+        else:
+            return False
+    
+    except Exception as e:
+        logger.error(f"Error occured while checking username availability.")
+        return False
+
+
 
 def get_user_id(username):
     """
@@ -45,26 +73,48 @@ def get_user_id(username):
 
 
 
-def create_user(username, master_secret):
+def create_user(data):
     """
     Creates a user, hashes the secret, and stores the information in the database.
 
     Args:
-        username (str): A unique username.
-        master_secret (str): The users master_secret.
+        data (dict): A dictionary with the user and password.
     
     Returns:
         bool: True if created succesfully.
-
-    Raises:
-        Exception: If creation was unsuccesful.
     """
+
+    # Check if al data is provided
+    if not data or 'username' not in data or 'password' not in data:
+        # Return bad request if not
+        return jsonify({
+            "error": "Bad request",
+            "message": "Username and password are required."
+        }), 400
+
+    # Get data from dict
+    username = data['username']
+    master_secret = data['password']
 
     # Check if username is valid
     if check_username_validity(username):
         pass
     else:
-        raise ValueError ("Invalid username")
+        # Return username not valid
+        return jsonify({
+            "error": "Username not valid",
+            "message": "Sorry, this username is not valid."
+        }), 200
+
+    # Check if username is available
+    if check_username_availability(username):
+        pass
+    else:
+        # Return username not available
+        return jsonify({
+            "error": "Username unavailable",
+            "message": "Sorry, this username is not available."
+        }), 200
 
     try:
         # Get the dbconfig for the vadafi database
@@ -140,10 +190,15 @@ def create_user(username, master_secret):
         # Log the success
         logger.info(f"Succesfully created user {username}!")
 
-    except psycopg2.errors.UniqueViolation:
-        logger.error(f"Username {username} is already taken.")
+        return jsonify({
+            "message": "User created succesfully."
+        }), 200
 
     except Exception as e:
         logger.error(f"Error occured while trying to create user {username} in vadafi database {e}")
-
-
+        
+        # Return error
+        return jsonify({
+            "error": "Error occured creating user",
+            "message": "Sorry, we could not create your user at this moment."
+        }), 400

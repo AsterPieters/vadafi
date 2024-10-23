@@ -2,12 +2,13 @@
 
 import os
 from flask import Flask, render_template, request, jsonify
-from flask_jwt_extended import JWTManager, create_access_token
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from pathlib import Path
 from dotenv import load_dotenv
  
 from modules.tools.authentication import authenticate_user
 from modules.tools.logger import vadafi_logger
+from modules.users import create_user
 
 logger = vadafi_logger()
 
@@ -27,6 +28,19 @@ jwt = JWTManager(app)
 @app.route('/')
 def home():
     return render_template('index.html')
+
+# Route for creating user
+@app.route('/create_user', methods=['POST'])
+def create_user_api():
+
+    # Get data from request
+    data = request.get_json()
+
+    # Create user
+    result = create_user(data)
+
+    # Check output for result
+    return result
 
 # Route for requesting JWT token
 @app.route('/get_jwt_token', methods=['POST'])
@@ -55,10 +69,16 @@ def get_jwt_token_api():
         "username": username
         }), 200
 
-# Route for creating user
-@app.route('/create_user', methods=['POST'])
-def create_user_api():
-    print("test")
+@app.route('/protected', methods=['GET'])
+@jwt_required()
+def protected_route():
+    # Get the username
+    current_user = get_jwt_identity()
+
+    return jsonify({
+        'message': 'Access granted',
+        'user': current_user
+    }), 200
 
 if __name__ == '__main__':
     app.run()
