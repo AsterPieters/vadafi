@@ -29,42 +29,36 @@ def home():
     return render_template('index.html')
 
 # Route for requesting JWT token
-@app.route('/get_token', methods=['POST'])
-def get_token():
+@app.route('/get_jwt_token', methods=['POST'])
+def get_jwt_token_api():
     
-    try:
-        # Get data from request
-        data = request.get_json()
+    # Get data from request
+    data = request.get_json()
 
-        # Authenticate user
-        response, username = authenticate_user(data)
-        # No or faulty data has been posted
-        if response == None:
-            return jsonify({
-                "error": "Bad request",
-                "message": "Username and password are required."
-            }), 400
+    # Check username and password
+    auth_result = authenticate_user(data)
 
-        # Username or password is wrong
-        if not response: 
-            return jsonify({
-                "error": "Unauthorized",
-                "message": "Invalid username."
-            }), 401
+    # Check output for result
+    if not isinstance(auth_result, tuple):
+        return jsonify({"error": "Internal Server Error", "message": "Unexpected response from authentication"}), 500
+    if auth_result[0] is not True:
+        return auth_result
 
-        # Authentication is succesful
-        if response:
-            # Create access token
-            access_token = create_access_token(identity=username)
+    # Create access token
+    username = auth_result[1]
+    access_token = create_access_token(identity=username)
 
-            return jsonify({
-                "message": "Authentication succesful",
-                "jwt": access_token,
-                "username": username
-                }), 200
+    # Return the jwt token
+    return jsonify({
+        "message": "Authentication succesful",
+        "jwt": access_token,
+        "username": username
+        }), 200
 
-    except Exception as e:
-        logger.error(f"Error occured while trying to respond. {e}")
+# Route for creating user
+@app.route('/create_user', methods=['POST'])
+def create_user_api():
+    print("test")
 
 if __name__ == '__main__':
     app.run()

@@ -109,18 +109,23 @@ def check_password(password, username):
 
 def authenticate_user(data):
     """
-    Authenticate user using a JSON string.
+    Check user's username and password.
 
     Args:
         data (JSON): The username and password of the user.
 
     Returns:
-        access_token (JSON): The jwt.
+        tuple: A tuple with the  
     """
 
     # Check if al data is provided
     if not data or 'username' not in data or 'password' not in data:
-        return None, None
+
+        # Return bad request if not
+        return jsonify({
+            "error": "Bad request",
+            "message": "Username and password are required."
+        }), 400
     
     # Get username and password from the data
     username = data['username']
@@ -128,10 +133,21 @@ def authenticate_user(data):
     
     # Check if user exists in vadafi-users database
     if not user_exists(username):
-        return False, None
+        
+        # Return unauthorized if user does not exist
+        return jsonify({
+            "error": "Unauthorized",
+            "message": "Invalid username or password."
+        }), 401
 
     # Check if password is correct
-    if check_password(password, username):
-        return True, username
-    else:
-        return False, None
+    if not check_password(password, username):
+        
+        # Return unauthorized if password is wrong
+        return jsonify({
+            "error": "Unauthorized",
+            "message": "Invalid username or password."
+        }), 401
+
+    # Authentication succesful
+    return True, username
