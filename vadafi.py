@@ -36,8 +36,20 @@ def create_user_api():
     # Get data from request
     data = request.get_json()
 
+    # Check if al data is provided
+    if not data or 'username' not in data or 'password' not in data:
+        # Return bad request if not
+        return jsonify({
+            "error": "Bad request",
+            "message": "Username and password are required."
+        }), 400
+
+    # Get data from dict
+    username = data['username']
+    password = data['password']
+    
     # Create user
-    result = create_user(data)
+    result = create_user(username, password)
 
     # Check output for result
     return result
@@ -79,6 +91,10 @@ def protected_route():
         'message': 'Access granted',
         'user': current_user
     }), 200
+
+
+
+
 
 if __name__ == '__main__':
     app.run()

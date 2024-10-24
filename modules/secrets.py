@@ -4,6 +4,7 @@
 from .tools.encryption import encrypt_secret
 from .tools.execute_query import execute_query
 from .tools.logger import vadafi_logger
+from .tools.authentication import get_user_dbconfig
 
 logger = vadafi_logger()
 
@@ -19,13 +20,7 @@ def add_secret(username, master_secret, secret_name, plain_text_secret):
         plain_text_secret (str): The secret in clear text.
     """
     # Create user credentials dict
-    credentials = {
-        'dbname': username,
-        'user': username,
-        'password': master_secret,
-        'host': "localhost",
-        'port': 5432
-        }
+    dbconfig = get_user_dbconfig(username, password)
 
     try:
         # Encrypt the secret

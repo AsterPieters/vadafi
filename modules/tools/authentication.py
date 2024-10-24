@@ -6,7 +6,6 @@ import base64
 from pathlib import Path
 from dotenv import load_dotenv
 from flask import jsonify
-from flask_jwt_extended import create_access_token
 
 from .execute_query import execute_query
 from .encryption import hash_secret
@@ -39,6 +38,67 @@ def get_admin_dbconfig(dbname="vadafi"):
         }
    
     return dbconfig
+
+
+
+def get_user_dbconfig(username, password):
+    """
+    Return dbconfig for the correct user.
+
+    Args:
+        username (STR): User's username.
+        password (STR): User's password.
+
+    Returns:
+        dbconfig (dict)
+    """    
+ 
+    # Load the .env file into the environment variables
+    env_path = Path('.env')
+    load_dotenv(env_path)
+
+    # Get the user's db_name & db_user_name
+    user_id = get_user_id(username)
+    db_name = f"db_{user_id}"
+    db_user_name = f"user_{user_id}"
+
+    # Put the credentials into the dbconfig dict
+    dbconfig = {
+    'dbname': db_name,
+    'user': db_user_name,
+    'password': password,
+    'host': os.getenv('DB_HOST'),
+    'port': os.getenv('DB_PORT')
+        }
+   
+    return dbconfig
+
+
+
+def get_user_id(username):
+    """
+    Get the unique identifier of a user.
+    """
+
+    # Get the dbconfig
+    dbconfig = get_admin_dbconfig()    
+
+    # Create the query
+    query="""
+    SELECT user_id FROM vadafi_users WHERE username = %s
+    """
+
+    # Get the user_id
+    result = execute_query(
+       query,
+       params=(username, ),
+       return_data=True,
+       dbconfig=dbconfig
+        )
+    if result:
+        return result[0][0]
+    else:
+        return None
 
 
 

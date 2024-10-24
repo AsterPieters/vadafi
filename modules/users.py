@@ -1,15 +1,13 @@
 # users.py
 
 import re
-import psycopg2
-from psycopg2.errors import QueryCanceled
 from flask import jsonify
 
 from .tools.encryption import hash_secret
 from .tools.execute_query import execute_query
 from .tools.logger import vadafi_logger
 from .tools.authentication import get_admin_dbconfig
-
+from .tools.authentication import get_user_id
 logger = vadafi_logger()
 
 def check_username_validity(username):
@@ -46,55 +44,18 @@ def check_username_availability(username):
 
 
 
-def get_user_id(username):
-    """
-    Get the unique identifier of a user.
-    """
-
-    # Get the dbconfig
-    dbconfig = get_admin_dbconfig()    
-
-    # Create the query
-    query="""
-    SELECT user_id FROM vadafi_users WHERE username = %s
-    """
-
-    # Get the user_id
-    result = execute_query(
-       query,
-       params=(username, ),
-       return_data=True,
-       dbconfig=dbconfig
-        )
-    if result:
-        return result[0][0]
-    else:
-        return None
-
-
-
-def create_user(data):
+def create_user(username, password):
     """
     Creates a user, hashes the secret, and stores the information in the database.
 
     Args:
-        data (dict): A dictionary with the user and password.
-    
+        username (STR): The user's username.
+        password (STR): The user's password.
+
     Returns:
         bool: True if created succesfully.
     """
 
-    # Check if al data is provided
-    if not data or 'username' not in data or 'password' not in data:
-        # Return bad request if not
-        return jsonify({
-            "error": "Bad request",
-            "message": "Username and password are required."
-        }), 400
-
-    # Get data from dict
-    username = data['username']
-    master_secret = data['password']
 
     # Check if username is valid
     if check_username_validity(username):
@@ -121,7 +82,7 @@ def create_user(data):
         vadafi_dbconfig = get_admin_dbconfig()
 
         # Hash the master secret
-        hashed_data = hash_secret(master_secret)
+        hashed_data = hash_secret(password)
 
         # Add user to vadafi_users
         query="""
@@ -155,7 +116,7 @@ def create_user(data):
         # Create database user
         execute_query(
             f"CREATE USER {db_user_name} WITH PASSWORD %s",
-            params=(master_secret,),
+            params=(password,),
             dbconfig=vadafi_dbconfig
             )
         logger.info(f"Created {db_user_name}.")
