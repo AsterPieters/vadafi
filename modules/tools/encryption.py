@@ -10,6 +10,10 @@ import base64
 import json
 import os
 
+from .logger import vadafi_logger
+logger = vadafi_logger()
+
+
 def encrypt_secret(master_secret, plain_text_secret):
     """
     Encrypt a plain text secret using the master password.
@@ -69,32 +73,35 @@ def decrypt_secret(master_secret, secret_data):
     Returns:
         plain_text_secret (str): the plain_text_secret.
     """
+    try:
+        #secret_data = json.loads(secret_data)
 
-    secret_data = json.loads(secret_data)
+        # Grab the data out of the dictionary
+        salt = base64.b64decode(secret_data['salt'])
+        iv = base64.b64decode(secret_data['iv'])
+        secret = base64.b64decode(secret_data['secret'])
 
-    # Grab the data out of the dictionary
-    salt = base64.b64decode(secret_data['salt'])
-    iv = base64.b64decode(secret_data['iv'])
-    secret = base64.b64decode(secret_data['secret'])
+        # Key derivation function 
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100_000,
+            backend=default_backend()
+        )
+     
+        # "Derive" the key from the master secret
+        encryption_key = kdf.derive(master_secret.encode())
+       
+        # Decrypt the secret
+        aesgcm = AESGCM(encryption_key)
+        decrypted_secret = aesgcm.decrypt(iv, secret, None)
+        plain_text_secret = decrypted_secret.decode()
 
-    # Key derivation function 
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=100_000,
-        backend=default_backend()
-    )
- 
-    # "Derive" the key from the master secret
-    encryption_key = kdf.derive(master_secret.encode())
-   
-    # Decrypt the secret
-    aesgcm = AESGCM(encryption_key)
-    decrypted_secret = aesgcm.decrypt(iv, secret, None)
-    plain_text_secret = decrypted_secret.decode()
+        return plain_text_secret
 
-    return plain_text_secret
+    except Exception as e:
+        logger.error(f"Error occured while trying to decrypt secret. {e}")
 
 
 

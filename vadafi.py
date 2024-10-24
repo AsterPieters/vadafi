@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from modules.tools.authentication import authenticate_user
 from modules.tools.logger import vadafi_logger
 from modules.users import create_user
-from modules.secrets import add_secret
+from modules.secrets import add_secret, fetch_secrets, reveal_secret
 
 logger = vadafi_logger()
 
@@ -130,6 +130,55 @@ def add_secret_api():
             plain_text_secret
         )
 
+    return result
+
+
+@app.route('/fetch_secrets', methods=['GET'])
+@jwt_required()
+def fetch_secrets_api():
+    # Get the data
+    data = request.get_json()
+
+    # Check if al data is provided
+    if not data or 'username' not in data or 'password' not in data:
+        # Return bad request if not
+        return jsonify({
+            "error": "Bad request",
+            "message": "Username and password are required."
+        }), 400
+
+    # Get the data from the dict
+    username = data['username']
+    password = data['password']
+
+    result = fetch_secrets(username, password) 
+    
+    return result
+
+
+
+@app.route('/reveal_secret', methods=['GET'])
+@jwt_required()
+def reveal_secret_api():
+    # Get the data
+    data = request.get_json()
+
+    # Check if al data is provided
+    if not data or 'username' not in data or 'password' not in data or 'secret_name' not in data:
+        # Return bad request if not
+        return jsonify({
+            "error": "Bad request",
+            "message": "Username, password and secret_name are required."
+        }), 400
+
+    # Get the data from the dict
+    username = data['username']
+    password = data['password']
+    secret_name = data['secret_name']
+
+    # Reveal the secret
+    result = reveal_secret(username, password, secret_name) 
+    
     return result
 
 

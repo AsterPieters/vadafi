@@ -1,10 +1,11 @@
 # secrets.py
 
-from .tools.encryption import encrypt_secret
+from flask import jsonify
+
+from .tools.encryption import encrypt_secret, decrypt_secret
 from .tools.execute_query import execute_query
 from .tools.logger import vadafi_logger
 from .tools.authentication import get_user_dbconfig
-from flask import jsonify
 
 logger = vadafi_logger()
 
@@ -34,6 +35,37 @@ def check_secret_availability(username, password, secret_name):
     except Exception as e:
         logger.error(f"Error occured while checking secret name availability.")
         return False
+
+
+
+def check_secret_existance(username, password, secret_name):
+    """
+    Check if secret exists in the user's secrets table.
+    """
+    try:
+        # Get the dbconfig
+        dbconfig = get_user_dbconfig(username, password)
+
+        # Create the query
+        query = """
+        SELECT COUNT(*) FROM secrets WHERE name = %s
+        """
+        result = execute_query(
+            query,
+            params=(secret_name,),
+            return_data=True,
+            dbconfig=dbconfig
+            )
+        if result[0][0] == 0:
+            return False
+        else:
+            return True
+    
+    except Exception as e:
+        logger.error(f"Error occured while checking secret existance. {e}")
+        return False
+
+
 
 def add_secret(username, password, secret_name, plain_text_secret):
     """
@@ -91,47 +123,101 @@ def add_secret(username, password, secret_name, plain_text_secret):
 
 
 
-def list_secrets(username, master_secret):
+def fetch_secrets(username, password):
     """
-    List all secrets in the database.
+    Fetch secrets in the user's secrets table.
 
     Args:
-        username (str): Username.
-        master_secret (str): The user's master secret.
+        username (str): The user's username.
+        password (str): The user's password.
+
+    Return:
+        result (JSON): The user's secret_id's and secret_names.
     """
-
-    # Create user credentials dict
-    credentials = {
-        'dbname': username,
-        'user': username,
-        'password': master_secret,
-        'host': "localhost",
-        'port': 5432
-        }
-
     try:
-        # Add secret to database
-        result = execute_query(f"select id, name from secrets;", return_data=True, credentials=credentials)
-        logger.info(f"Fetched all secrets in table: secrets on database: {username} of user: {username}.")
+        # Get the dbconfig
+        dbconfig = get_user_dbconfig(username, password)
 
-        return result
+        # Fetch secrets
+        result = execute_query(
+            f"SELECT id, name FROM secrets;", 
+            return_data=True,
+            dbconfig=dbconfig
+            )
+        logger.info(f"Fetched secrets of user {username}.")
+
+        return jsonify({
+            "message": "Fetched secrets succesfully.",
+            "data": result
+            }), 200
 
     except Exception as e:
-        logger.error(f"Error occured while trying to list secrets in table secrets on database {username} of user {username}. {e}")
-        return False
+        logger.error(f"Error occured while trying to fetch secrets for user {username}. {e}")
+        
+        return jsonify({
+            "error": "Error occured while fetching secrets",
+            "message": "Sorry, we could not fetch your secrets at this moment."
+            }), 400
 
 
 
-def reveal_secret(credentials, secret_name):
+def reveal_secret(username, password, secret_name):
     """
     Reveal a secret.
 
     Args:
-        credentials (dict): A dictionary with the user's credentials.
-        secret_name (str): The name of the secret to be revealed.
+        username (STR): The user's username.
+        password (STR): The user's password.
+        secret_name (STR): The to be revealed secret.
 
     Returns:
-        plain_text_secret (str): The secret in plain text.
+        plain_text_secret (str): The revealed secret in plain text.
     """
+    try:
+        # Get the dbconfig
+        dbconfig = get_user_dbconfig(username, password)
+
+        if check_secret_existance(username, password, secret_name):
+            pass
+        else:
+            # Return secret not found
+            return jsonify({
+                "error": "Secret not found",
+                "message": "Sorry, this secret could not be found."
+            }), 200
+
+        # Create the query
+        query = """
+        SELECT secret, salt, iv FROM secrets WHERE name = %s
+        """
+        result = execute_query(
+            query,
+            params=(secret_name,),
+            return_data=True,
+            dbconfig=dbconfig
+            )
+
+        # Get the data
+        secret_data = {
+            'secret': result[0][0],
+            'salt': result[0][1],
+            'iv': result[0][2]
+            }
+
+        # Decrypt the secret
+        plain_text_secret = decrypt_secret(password, secret_data)
+
+        return jsonify({
+            "message": "Revealed secret succesfully.",
+            "data": plain_text_secret
+            }), 200
+
+    except Exception as e:
+        logger.error(f"Error occured while revealing secret {secret_name} for user {username}. {e}")
+        
+        return jsonify({
+            "error": "Error occured while fetching secrets",
+            "message": "Sorry, we could not fetch your secret at this moment."
+            }), 400
 
 
