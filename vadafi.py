@@ -30,7 +30,9 @@ jwt = JWTManager(app)
 def home():
     return render_template('index.html')
 
-
+@app.route('/about')
+def about():
+    return "This is the about page!"
 
 # Route for creating user
 @app.route('/create_user', methods=['POST'])
