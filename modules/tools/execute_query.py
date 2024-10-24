@@ -1,36 +1,13 @@
 # execute_query.py
 
 import psycopg2
-from pathlib import Path
-from dotenv import load_dotenv
-import sys
-import os
-
-
 from psycopg2 import OperationalError, DatabaseError
+
 from .logger import vadafi_logger
 
 logger = vadafi_logger()
 
-def load_admin_credentials():
-    # Load database credentails into the env variables
-    env_path = Path('.env')
-    load_dotenv(env_path)
-
-    # Get the database credentials out of the env variables
-    credentials = {
-        'dbname': os.getenv('DB_NAME'),
-        'user': os.getenv('DB_USER'),
-        'password': os.getenv('DB_PASSWORD'),
-        'host': os.getenv('DB_HOST'),
-        'port': os.getenv('DB_PORT'),
-            }
-
-    return credentials
-
-
-
-def execute_query(query, return_data=False, params=None, autocommit=False, credentials=None):
+def execute_query(query, return_data=False, params=None, autocommit=False, dbconfig=None):
     """
     Executes a query on the vadafi database.
 
@@ -48,10 +25,6 @@ def execute_query(query, return_data=False, params=None, autocommit=False, crede
         Exception: If a database error occurs.
     """
 
-    # Load the admin creds if no provided
-    if not credentials:
-        credentials = load_admin_credentials()
-
     # Initialize connection
     connection = None
     cursor = None
@@ -59,7 +32,7 @@ def execute_query(query, return_data=False, params=None, autocommit=False, crede
 
     try:
         # Connect to the Database
-        connection = psycopg2.connect(**credentials)
+        connection = psycopg2.connect(**dbconfig)
         
         # Enable autocommit if True
         if autocommit:
@@ -84,10 +57,11 @@ def execute_query(query, return_data=False, params=None, autocommit=False, crede
     # Exit the program if the database has issues
     except OperationalError as e:
         logger.error(f"Operational error occured while executing query: {e}")
-        sys.exit()
+        raise
 
     except DatabaseError as e:
         logger.error(f"Database error occured while executing query: {e}")
+        return False
 
     finally:
         # Close the connection safely
@@ -99,5 +73,6 @@ def execute_query(query, return_data=False, params=None, autocommit=False, crede
 
     # Return data or empty list
     if return_data:
-        return results
-
+        return results 
+    else:
+        return True
