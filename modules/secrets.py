@@ -18,7 +18,7 @@ def check_secret_availability(username, password, secret_name):
 
         # Create the query
         query = """
-        SELECT COUNT(*) FROM secrets WHERE secret_name = %s
+        SELECT COUNT(*) FROM secrets WHERE name = %s
         """
         result = execute_query(
             query,
@@ -32,7 +32,7 @@ def check_secret_availability(username, password, secret_name):
             return False
     
     except Exception as e:
-        logger.error(f"Error occured while checking username availability.")
+        logger.error(f"Error occured while checking secret name availability.")
         return False
 
 def add_secret(username, password, secret_name, plain_text_secret):
@@ -75,7 +75,7 @@ def add_secret(username, password, secret_name, plain_text_secret):
             params=(secret_name, secret_data["secret"], secret_data["salt"], secret_data["iv"]),
             dbconfig=dbconfig
         )
-        logger.info(f"Added secret {secret_name} for user: {username}.")
+        logger.info(f"Added secret {secret_name} for user {username}.")
 
         return jsonify({
             "message": "Secret created succesfully."
