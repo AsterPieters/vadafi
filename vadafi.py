@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from modules.tools.authentication import authenticate_user
 from modules.tools.logger import vadafi_logger
 from modules.users import create_user
+from modules.secrets import add_secret
 
 logger = vadafi_logger()
 
@@ -28,6 +29,8 @@ jwt = JWTManager(app)
 @app.route('/')
 def home():
     return render_template('index.html')
+
+
 
 # Route for creating user
 @app.route('/create_user', methods=['POST'])
@@ -53,6 +56,8 @@ def create_user_api():
 
     # Check output for result
     return result
+
+
 
 # Route for requesting JWT token
 @app.route('/get_jwt_token', methods=['POST'])
@@ -81,6 +86,8 @@ def get_jwt_token_api():
         "username": username
         }), 200
 
+
+
 @app.route('/protected', methods=['GET'])
 @jwt_required()
 def protected_route():
@@ -94,6 +101,36 @@ def protected_route():
 
 
 
+
+@app.route('/add_secret', methods=['POST'])
+@jwt_required()
+def add_secret_api():
+    # Get the data
+    data = request.get_json()
+
+    # Check if al data is provided
+    if not data or 'username' not in data or 'password' not in data or 'secret_name' not in data or 'plain_text_secret' not in data:
+        # Return bad request if not
+        return jsonify({
+            "error": "Bad request",
+            "message": "Username, password, secret_name, plain_text_secret are required."
+        }), 400
+
+    # Get the data from dict
+    username = data['username']
+    password = data['password']
+    secret_name = data['secret_name']
+    plain_text_secret = data['plain_text_secret']
+
+    # Add secret
+    result = add_secret(
+            username,
+            password,
+            secret_name,
+            plain_text_secret
+        )
+
+    return result
 
 
 if __name__ == '__main__':

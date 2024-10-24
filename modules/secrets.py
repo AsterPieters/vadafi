@@ -1,30 +1,67 @@
 # secrets.py
 
-
 from .tools.encryption import encrypt_secret
 from .tools.execute_query import execute_query
 from .tools.logger import vadafi_logger
 from .tools.authentication import get_user_dbconfig
+from flask import jsonify
 
 logger = vadafi_logger()
 
+def check_secret_availability(username, password, secret_name):
+    """
+    Check if secret_name is available in the user's secrets table.
+    """
+    try:
+        # Get the dbconfig
+        dbconfig = get_user_dbconfig(username, password)
 
-def add_secret(username, master_secret, secret_name, plain_text_secret):
+        # Create the query
+        query = """
+        SELECT COUNT(*) FROM secrets WHERE secret_name = %s
+        """
+        result = execute_query(
+            query,
+            params=(secret_name,),
+            return_data=True,
+            dbconfig=dbconfig
+            )
+        if result[0][0] == 0:
+            return True
+        else:
+            return False
+    
+    except Exception as e:
+        logger.error(f"Error occured while checking username availability.")
+        return False
+
+def add_secret(username, password, secret_name, plain_text_secret):
     """
     Encrypt and add secret to the database.
 
     Args:
-        username (str): Username.
-        master_secret (str): The user's master secret.
+        username (str): The user's username.
+        password (str): The user's password.
         secret_name (str): The name of the secret.
         plain_text_secret (str): The secret in clear text.
     """
-    # Create user credentials dict
+
+    if check_secret_availability(username, password, secret_name):
+        pass
+    else:
+        # Return secret name not valid
+        return jsonify({
+            "error": "Secret name not available",
+            "message": "Sorry, this secret name is not available."
+        }), 200       
+
+
+    # Create dbconfig
     dbconfig = get_user_dbconfig(username, password)
 
     try:
         # Encrypt the secret
-        secret_data = encrypt_secret(master_secret, plain_text_secret)
+        secret_data = encrypt_secret(password, plain_text_secret)
 
         # Create the query
         query = """
@@ -32,23 +69,25 @@ def add_secret(username, master_secret, secret_name, plain_text_secret):
         VALUES (%s, %s, %s, %s)
         """
 
-        # Set the params
-        params = (
-            secret_name, 
-            secret_data["secret"], 
-            secret_data["salt"], 
-            secret_data["iv"]
-            )
+        # Add the secret to the database
+        execute_query(
+            query,
+            params=(secret_name, secret_data["secret"], secret_data["salt"], secret_data["iv"]),
+            dbconfig=dbconfig
+        )
+        logger.info(f"Added secret {secret_name} for user: {username}.")
 
-        # Add secret to database
-        execute_query (query, params=params, credentials=credentials)
-        logger.info(f"Added secret: {secret_name} to table: secrets on database: {username} for user: {username}.")
-
-        return True
+        return jsonify({
+            "message": "Secret created succesfully."
+        }), 200
 
     except Exception as e:
-        logger.error(f"Error occurred while trying to add secret: {secret_name} to database: {username}. {e}")
-        return False
+        logger.error(f"Error occurred while trying to add secret {secret_name} for user {username}. {e}")
+
+        return jsonify({
+            "error": "Error occured while adding secret",
+            "message": "Sorry, we could not add your secret at this moment."
+        }), 400
 
 
 
