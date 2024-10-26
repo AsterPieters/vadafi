@@ -14,6 +14,22 @@ services:
       - postgres_data:/var/lib/postgresql/data
     restart: always
 
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+
 volumes:
   postgres_data:
 

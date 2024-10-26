@@ -1,0 +1,8 @@
+# requirements.py
+
+Flask==2.3.2
+Flask-Cors==5.0.0
+cryptography==43.0.1
+psycopg2==2.9.9
+python-dotenv==1.0.1
+Flask-JWT-Extended==4.6.0
