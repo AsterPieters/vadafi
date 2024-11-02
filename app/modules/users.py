@@ -77,89 +77,9 @@ def create_user(username, password):
             "message": "Sorry, this username is not available."
         }), 200
 
-    try:
-        # Get the dbconfig for the vadafi database
-        vadafi_dbconfig = get_admin_dbconfig()
-
-        # Hash the master secret
-        hashed_data = hash_secret(password)
-
-        # Add user to vadafi_users
-        query="""
-        INSERT INTO vadafi_users (username, master_secret_hash, salt)
-        VALUES (%s, %s, %s)
-        """
-        execute_query(
-            query,
-            params=(username, hashed_data["secret_hash"], hashed_data["salt"]),
-            dbconfig=vadafi_dbconfig
-            )
-        logger.info(f"Created user {username} in vadafi_users table.")
-    
-        # Name database & database_user based on user's unique identifier
-        user_id = get_user_id(username) 
-        db_name = f"db_{user_id}"
-        db_user_name = f"user_{user_id}"
-
-        # Get the dbconfig for the user database
-        # This will also be as the admin
-        user_dbconfig = get_admin_dbconfig(db_name)
         
-        # Create database
-        execute_query(
-            f"CREATE DATABASE {db_name}",
-            autocommit=True,
-            dbconfig=vadafi_dbconfig
-            )
-        logger.info(f"Created {db_name}.")
-
-        # Create database user
-        execute_query(
-            f"CREATE USER {db_user_name} WITH PASSWORD %s",
-            params=(password,),
-            dbconfig=vadafi_dbconfig
-            )
-        logger.info(f"Created {db_user_name}.")
-
-        # Create secret table
-        query = """
-        CREATE TABLE secrets (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            secret TEXT NOT NULL,
-            salt VARCHAR(255) NOT NULL,
-            iv VARCHAR(255) NOT NULL
-        );
-        """
-        execute_query(
-                query, 
-                dbconfig=user_dbconfig
-                )
-        logger.info(f"Created table 'secrets' on {db_name}.")
-
-        # Configure the user's privileges
-        execute_query(f"ALTER DATABASE {db_name} OWNER TO {db_user_name};", dbconfig=user_dbconfig)
-        execute_query(f"ALTER SCHEMA public OWNER TO {db_user_name};", dbconfig=user_dbconfig)
-        execute_query(f"GRANT ALL PRIVILEGES ON SCHEMA public TO {db_user_name};", dbconfig=user_dbconfig)
-        execute_query(f"GRANT USAGE, CREATE ON SCHEMA public TO {db_user_name};", dbconfig=user_dbconfig)
-        execute_query(f"ALTER TABLE public.secrets OWNER TO {db_user_name};", dbconfig=user_dbconfig)
-        execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {db_user_name};", dbconfig=user_dbconfig)
-        execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO {db_user_name};", dbconfig=user_dbconfig)
-        execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO {db_user_name};", dbconfig=user_dbconfig)
-        logger.info(f"Configured privileges for {db_user_name} in database {db_name}.")
-
-        # Log the success
-        logger.info(f"Succesfully created user {username}!")
 
         return jsonify({
             "message": "User created succesfully."
         }), 200
 
-    except Exception as e:
-        logger.error(f"Error occured while trying to create user {username} in vadafi database {e}")
-        
-        # Return error
-        return jsonify({
-            "error": "Error occured creating user",
-            "message": "Sorry, we could not create your user at this moment."
-        }), 400

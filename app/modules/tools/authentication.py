@@ -75,30 +75,6 @@ def get_user_dbconfig(username, password):
 
 
 
-def get_user_id(username):
-    """
-    Get the unique identifier of a user.
-    """
-
-    # Get the dbconfig
-    dbconfig = get_admin_dbconfig()    
-
-    # Create the query
-    query="""
-    SELECT user_id FROM vadafi_users WHERE username = %s
-    """
-
-    # Get the user_id
-    result = execute_query(
-       query,
-       params=(username, ),
-       return_data=True,
-       dbconfig=dbconfig
-        )
-    if result:
-        return result[0][0]
-    else:
-        return None
 
 
 

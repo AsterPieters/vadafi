@@ -4,14 +4,39 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
-
-import argparse
 import base64
-import json
 import os
 
+from .authentication import get_user_id
+from .authentication import get_admin_dbconfig
 from .logger import vadafi_logger
+from .execute_query import execute_query
 logger = vadafi_logger()
+
+
+def encrypt_master_password(username, plain_text_master_password):
+    """
+    Encrypt the master password using the vadafi master secret
+    """
+    
+    dbconfig = get_admin_dbconfig()
+
+    # Get the user's salt
+    userid = get_user_id(username)
+    query = """
+    SELECT salt from vadafi_users WHERE username = %s
+    """
+    result = execute_query(
+        query,
+        params=(username,),
+        return_data=True,
+        dbconfig=dbconfig
+        )
+    salt = result[0][0]
+
+    base64.b64decode(salt)
+    print(salt)
+
 
 
 def encrypt_secret(master_secret, plain_text_secret):
