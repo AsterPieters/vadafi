@@ -41,37 +41,6 @@ def get_admin_dbconfig(dbname="vadafi"):
 
 
 
-def get_user_dbconfig(username, password):
-    """
-    Return dbconfig for the correct user.
-
-    Args:
-        username (STR): User's username.
-        password (STR): User's password.
-
-    Returns:
-        dbconfig (dict)
-    """    
- 
-    # Load the .env file into the environment variables
-    env_path = Path('.env')
-    load_dotenv(env_path)
-
-    # Get the user's db_name & db_user_name
-    user_id = get_user_id(username)
-    db_name = f"db_{user_id}"
-    db_user_name = f"user_{user_id}"
-
-    # Put the credentials into the dbconfig dict
-    dbconfig = {
-    'dbname': db_name,
-    'user': db_user_name,
-    'password': password,
-    'host': os.getenv('DB_HOST'),
-    'port': os.getenv('DB_PORT')
-        }
-   
-    return dbconfig
 
 
 

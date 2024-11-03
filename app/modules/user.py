@@ -7,7 +7,6 @@ from .tools.encryption import hash_secret
 from .tools.execute_query import execute_query
 from .tools.logger import vadafi_logger
 from .tools.authentication import get_admin_dbconfig
-from .tools.authentication import get_user_id
 logger = vadafi_logger()
 
 class User:
@@ -45,38 +44,41 @@ class User:
             logger.info(f"Created user {self.username} in vadafi_users table.")
         
             # Name database & database_user based on user's unique identifier
-            self.user_id = get_user_id(self.username) 
+            self.user_id = self.get_id() 
             self.db_name = f"db_{self.user_id}"
             self.db_user_name = f"user_{self.user_id}"
 
         except Exception as e:
-            logger.error(f"Error occured while trying to create user {username} in vadafi database {e}")
+            logger.error(f"Error occured while trying to create user {self.username} in vadafi database {e}")
         
-        # Return error
-        return jsonify({
-            "error": "Error occured creating user",
-            "message": "Sorry, we could not create your user at this moment."
-        }), 400
+            # Return error
+            return jsonify({
+                "error": "Error occured creating user",
+                "message": "Sorry, we could not create your user at this moment."
+            }), 400
 
 
 
     def create_database(self):
+        """
+        Create the user's database and 'secrets' table.
+        """
         try:
             # Create database
             execute_query(
-                f"CREATE DATABASE {db_name}",
+                f"CREATE DATABASE {self.db_name}",
                 autocommit=True,
                 dbconfig=vadafi_dbconfig
                 )
-            logger.info(f"Created {db_name}.")
+            logger.info(f"Created {self.db_name}.")
 
             # Create database user
             execute_query(
                 f"CREATE USER {db_user_name} WITH PASSWORD %s",
-                params=(password,),
+                params=(self.master_password,),
                 dbconfig=vadafi_dbconfig
                 )
-            logger.info(f"Created {db_user_name}.")
+            logger.info(f"Created {self.db_user_name}.")
 
             # Create secret table
             query = """
@@ -92,7 +94,7 @@ class User:
                     query, 
                     dbconfig=user_dbconfig
                     )
-            logger.info(f"Created table 'secrets' on {db_name}.")
+            logger.info(f"Created table 'secrets' on {self.db_name}.")
 
             # Configure the user's privileges
             execute_query(f"ALTER DATABASE {db_name} OWNER TO {db_user_name};", dbconfig=user_dbconfig)
@@ -113,33 +115,65 @@ class User:
 
 
 
-        def get_id(self):
-            """
-            Get the unique identifier of the user.
-            """
+    def get_id(self):
+        """
+        Get the unique identifier of the user.
+        """
 
-            # Get the dbconfig
-            dbconfig = get_admin_dbconfig()    
+        # Get the dbconfig
+        dbconfig = get_admin_dbconfig()    
 
-            # Create the query
-            query="""
-            SELECT user_id FROM vadafi_users WHERE username = %s
-            """
+        # Create the query
+        query="""
+        SELECT user_id FROM vadafi_users WHERE username = %s
+        """
 
-            # Get the user_id
-            result = execute_query(
-               query,
-               params=(username, ),
-               return_data=True,
-               dbconfig=dbconfig
-                )
-            if result:
-                return result[0][0]
-            else:
-                return None
+        # Get the user_id
+        result = execute_query(
+           query,
+           params=(username, ),
+           return_data=True,
+           dbconfig=dbconfig
+            )
+        if result:
+            return result[0][0]
+        else:
+            return None
 
 
 
-            # Get the dbconfig for the user database
-            # This will also be as the admin
-            user_dbconfig = get_admin_dbconfig(self.db_name)
+        # Get the dbconfig for the user database
+        # This will also be as the admin
+        user_dbconfig = get_admin_dbconfig(self.db_name)
+
+
+
+
+
+
+    def get_user_dbconfig(self):
+        """
+        Get the dbconfig of the user.
+
+        Args:
+            username (STR): User's username.
+            password (STR): User's password.
+
+        Returns:
+            dbconfig (dict)
+        """    
+     
+        # Load the .env file into the environment variables
+        env_path = Path('.env')
+        load_dotenv(env_path)
+
+        # Put the credentials into the dbconfig dict
+        dbconfig = {
+        'dbname': self.db_name,
+        'user': self.db_user_name,
+        'password': self.master_password,
+        'host': os.getenv('DB_HOST'),
+        'port': os.getenv('DB_PORT')
+            }
+       
+        return dbconfig
