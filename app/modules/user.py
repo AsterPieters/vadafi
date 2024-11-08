@@ -8,8 +8,10 @@ from werkzeug.wrappers import response
 
 from .tools.encryption import hash_secret
 from .tools.execute_query import execute_query
+from .tools.execute_query import get_admin_dbconfig
 from .tools.logger import vadafi_logger
-from .tools.authentication import get_admin_dbconfig, user_exists, check_username_availability, check_username_validity
+from .tools.authentication import user_exists
+from .users import check_username_validity, check_username_availability
 logger = vadafi_logger()
 
 class User:
@@ -18,7 +20,7 @@ class User:
     def __init__(self, username, master_password):
 
         # Check user existence before fetching database
-        if user_exists(self.username):
+        if user_exists(username):
             self.load_info(username, master_password)
         else:
             # Create the new user
@@ -40,10 +42,10 @@ class User:
         
 
 
-    def create(self, username, master_password):
+    def create(self):
         
         # Create user and database
-        success, response = self.create_user(username, master_password)
+        success, response = self.create_user(self.username, self.master_password)
         if not success:
             return response
         success, response = self.create_database()
@@ -52,7 +54,7 @@ class User:
 
 
         return jsonify({
-            "message": f"User {username} and database created successfully."
+            "message": f"User {self.username} and database created successfully."
         }), 201
 
 
@@ -101,7 +103,9 @@ class User:
                 params=(username, hashed_master_password, salt),
                 dbconfig=vadafi_dbconfig
                 )
-            
+           
+            self.load_info(username, master_password)
+
             # Success
             logger.info(f"Created user {username} in vadafi_users table.")
             return True, None
@@ -123,6 +127,7 @@ class User:
         try:
             # Get the admin dbconfig
             admin_dbconfig = get_admin_dbconfig()
+            user_admin_dbconfig = get_admin_dbconfig(dbname=self.db_name)
 
             # Create database
             execute_query(
@@ -152,19 +157,19 @@ class User:
             """
             execute_query(
                     query, 
-                    dbconfig=self.dbconfig
+                    dbconfig=user_admin_dbconfig
                     )
             logger.info(f"Created table 'secrets' on {self.db_name}.")
 
             # Configure the user's privileges
-            execute_query(f"ALTER DATABASE {self.db_name} OWNER TO {self.db_user_name};", dbconfig=self.dbconfig)
-            execute_query(f"ALTER SCHEMA public OWNER TO {self.db_user_name};", dbconfig=self.dbconfig)
-            execute_query(f"GRANT ALL PRIVILEGES ON SCHEMA public TO {self.db_user_name};", dbconfig=self.dbconfig)
-            execute_query(f"GRANT USAGE, CREATE ON SCHEMA public TO {self.db_user_name};", dbconfig=self.dbconfig)
-            execute_query(f"ALTER TABLE public.secrets OWNER TO {self.db_user_name};", dbconfig=self.dbconfig)
-            execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {self.db_user_name};", dbconfig=self.dbconfig)
-            execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO {self.db_user_name};", dbconfig=self.dbconfig)
-            execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO {self.db_user_name};", dbconfig=self.dbconfig)
+            execute_query(f"ALTER DATABASE {self.db_name} OWNER TO {self.db_user_name};", dbconfig=user_admin_dbconfig)
+            execute_query(f"ALTER SCHEMA public OWNER TO {self.db_user_name};", dbconfig=user_admin_dbconfig)
+            execute_query(f"GRANT ALL PRIVILEGES ON SCHEMA public TO {self.db_user_name};", dbconfig=user_admin_dbconfig)
+            execute_query(f"GRANT USAGE, CREATE ON SCHEMA public TO {self.db_user_name};", dbconfig=user_admin_dbconfig)
+            execute_query(f"ALTER TABLE public.secrets OWNER TO {self.db_user_name};", dbconfig=user_admin_dbconfig)
+            execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {self.db_user_name};", dbconfig=user_admin_dbconfig)
+            execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO {self.db_user_name};", dbconfig=user_admin_dbconfig)
+            execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO {self.db_user_name};", dbconfig=user_admin_dbconfig)
             logger.info(f"Configured privileges for {self.db_user_name} in database {self.db_name}.")
 
             # Success

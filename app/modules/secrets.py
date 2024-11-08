@@ -5,7 +5,6 @@ from flask import jsonify
 from .tools.encryption import encrypt_secret, decrypt_secret
 from .tools.execute_query import execute_query
 from .tools.logger import vadafi_logger
-from .tools.authentication import get_user_dbconfig
 
 logger = vadafi_logger()
 

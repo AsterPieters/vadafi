@@ -7,14 +7,12 @@ from cryptography.hazmat.backends import default_backend
 import base64
 import os
 
-from .authentication import get_user_id
-from .authentication import get_admin_dbconfig
 from .logger import vadafi_logger
 from .execute_query import execute_query
 logger = vadafi_logger()
 
 
-def encrypt_master_password(username, plain_text_master_password):
+def encrypt_master_password(user):
     """
     Encrypt the master password using the vadafi master secret
     """

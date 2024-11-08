@@ -2,7 +2,7 @@
 
 import re
 
-from tools.authentication import get_admin_dbconfig
+from .tools.execute_query import get_admin_dbconfig
 from .tools.execute_query import execute_query  
 from .tools.logger import vadafi_logger
 

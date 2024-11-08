@@ -2,6 +2,9 @@
 
 import psycopg2
 from psycopg2 import OperationalError, DatabaseError
+from dotenv import load_dotenv
+from pathlib import Path
+import os
 
 from .logger import vadafi_logger
 
@@ -76,3 +79,34 @@ def execute_query(query, return_data=False, params=None, autocommit=False, dbcon
         return results 
     else:
         return True
+
+
+
+def get_admin_dbconfig(dbname="vadafi"): 
+    """
+    Return dbconfig for the vadafi-admin user.
+
+    Args:
+        dbname (STR): Name of database to login to.
+
+    Returns:
+        dbconfig (dict)
+    """
+
+    # Load the .env file into the environment variables
+    env_path = Path('.env')
+    load_dotenv(env_path)
+
+    # Put the credentials into the dbconfig dict
+    dbconfig = {
+    'dbname': dbname,
+    'user': os.getenv('DB_USER'),
+    'password': os.getenv('DB_PASSWORD'),
+    'host': os.getenv('DB_HOST'),
+    'port': os.getenv('DB_PORT')
+        }
+   
+    return dbconfig
+
+
+
