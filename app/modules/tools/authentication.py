@@ -1,6 +1,7 @@
 # authentication.py
 
 import os
+import re
 import base64
 
 from pathlib import Path
@@ -38,12 +39,6 @@ def get_admin_dbconfig(dbname="vadafi"):
         }
    
     return dbconfig
-
-
-
-
-
-
 
 
 
@@ -156,3 +151,7 @@ def authenticate_user(data):
 
     # Authentication succesful
     return True, username
+
+
+
+

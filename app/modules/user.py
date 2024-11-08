@@ -1,35 +1,95 @@
 # user.py
 
-import re
+import os
+from dotenv import load_dotenv
+from pathlib import Path
 from flask import jsonify
+from werkzeug.wrappers import response
 
 from .tools.encryption import hash_secret
 from .tools.execute_query import execute_query
 from .tools.logger import vadafi_logger
-from .tools.authentication import get_admin_dbconfig
+from .tools.authentication import get_admin_dbconfig, user_exists, check_username_availability, check_username_validity
 logger = vadafi_logger()
 
 class User:
     
     # Initialize the user
     def __init__(self, username, master_password):
+
+        # Check user existence before fetching database
+        if user_exists(self.username):
+            self.load_info(username, master_password)
+        else:
+            # Create the new user
+            self.create_user(username, master_password)
+            self.create_database()
+
+
+
+    def load_info(self, username, master_password):
+        """
+        Load user info from database.
+        """
         self.username = username
         self.master_password = master_password
+        self.user_id = self.get_id() 
+        self.db_name = f"db_{self.user_id}"
+        self.db_user_name = f"user_{self.user_id}"
+        self.dbconfig = self.get_dbconfig()
+        
+
+
+    def create(self, username, master_password):
+        
+        # Create user and database
+        success, response = self.create_user(username, master_password)
+        if not success:
+            return response
+        success, response = self.create_database()
+        if not success:
+            return response
+
+
+        return jsonify({
+            "message": f"User {username} and database created successfully."
+        }), 201
 
 
 
-    def create_user(self):
+
+    def create_user(self, username, master_password):
         """
         Create the user in the vadafi_user table and database.
         """
         try:
+            # Check if username is valid
+            if check_username_validity(username):
+                pass
+            else:
+                # Return username not valid
+                return False, jsonify({
+                    "error": "Username not valid",
+                    "message": "Sorry, this username is not valid."
+                }), 200
+
+            # Check if username is available
+            if check_username_availability(username):
+                pass
+            else:
+                # Return username not available
+                return False, jsonify({
+                    "error": "Username unavailable",
+                    "message": "Sorry, this username is not available."
+                }), 200
+
             # Get the dbconfig for the vadafi database
             vadafi_dbconfig = get_admin_dbconfig()
 
             # Hash the master password and get the values
-            hashed_data = hash_secret(self.master_password)
-            self.hashed_master_password = hashed_data["secret_hash"]
-            self.salt = hashed_data["salt"]
+            hashed_data = hash_secret(master_password)
+            hashed_master_password = hashed_data["secret_hash"]
+            salt = hashed_data["salt"]
 
             # Add user to vadafi_users
             query="""
@@ -38,24 +98,21 @@ class User:
             """
             execute_query(
                 query,
-                params=(self.username,),
+                params=(username, hashed_master_password, salt),
                 dbconfig=vadafi_dbconfig
                 )
-            logger.info(f"Created user {self.username} in vadafi_users table.")
+            
+            # Success
+            logger.info(f"Created user {username} in vadafi_users table.")
+            return True, None
         
-            # Name database & database_user based on user's unique identifier
-            self.user_id = self.get_id() 
-            self.db_name = f"db_{self.user_id}"
-            self.db_user_name = f"user_{self.user_id}"
 
         except Exception as e:
             logger.error(f"Error occured while trying to create user {self.username} in vadafi database {e}")
-        
-            # Return error
-            return jsonify({
-                "error": "Error occured creating user",
+            return False, jsonify({
+                "error": "User creation error",
                 "message": "Sorry, we could not create your user at this moment."
-            }), 400
+            }), 500
 
 
 
@@ -64,19 +121,22 @@ class User:
         Create the user's database and 'secrets' table.
         """
         try:
+            # Get the admin dbconfig
+            admin_dbconfig = get_admin_dbconfig()
+
             # Create database
             execute_query(
                 f"CREATE DATABASE {self.db_name}",
                 autocommit=True,
-                dbconfig=vadafi_dbconfig
+                dbconfig=admin_dbconfig
                 )
             logger.info(f"Created {self.db_name}.")
 
             # Create database user
             execute_query(
-                f"CREATE USER {db_user_name} WITH PASSWORD %s",
+                f"CREATE USER {self.db_user_name} WITH PASSWORD %s",
                 params=(self.master_password,),
-                dbconfig=vadafi_dbconfig
+                dbconfig=admin_dbconfig
                 )
             logger.info(f"Created {self.db_user_name}.")
 
@@ -92,26 +152,34 @@ class User:
             """
             execute_query(
                     query, 
-                    dbconfig=user_dbconfig
+                    dbconfig=self.dbconfig
                     )
             logger.info(f"Created table 'secrets' on {self.db_name}.")
 
             # Configure the user's privileges
-            execute_query(f"ALTER DATABASE {db_name} OWNER TO {db_user_name};", dbconfig=user_dbconfig)
-            execute_query(f"ALTER SCHEMA public OWNER TO {db_user_name};", dbconfig=user_dbconfig)
-            execute_query(f"GRANT ALL PRIVILEGES ON SCHEMA public TO {db_user_name};", dbconfig=user_dbconfig)
-            execute_query(f"GRANT USAGE, CREATE ON SCHEMA public TO {db_user_name};", dbconfig=user_dbconfig)
-            execute_query(f"ALTER TABLE public.secrets OWNER TO {db_user_name};", dbconfig=user_dbconfig)
-            execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {db_user_name};", dbconfig=user_dbconfig)
-            execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO {db_user_name};", dbconfig=user_dbconfig)
-            execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO {db_user_name};", dbconfig=user_dbconfig)
-            logger.info(f"Configured privileges for {db_user_name} in database {db_name}.")
+            execute_query(f"ALTER DATABASE {self.db_name} OWNER TO {self.db_user_name};", dbconfig=self.dbconfig)
+            execute_query(f"ALTER SCHEMA public OWNER TO {self.db_user_name};", dbconfig=self.dbconfig)
+            execute_query(f"GRANT ALL PRIVILEGES ON SCHEMA public TO {self.db_user_name};", dbconfig=self.dbconfig)
+            execute_query(f"GRANT USAGE, CREATE ON SCHEMA public TO {self.db_user_name};", dbconfig=self.dbconfig)
+            execute_query(f"ALTER TABLE public.secrets OWNER TO {self.db_user_name};", dbconfig=self.dbconfig)
+            execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO {self.db_user_name};", dbconfig=self.dbconfig)
+            execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO {self.db_user_name};", dbconfig=self.dbconfig)
+            execute_query(f"ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO {self.db_user_name};", dbconfig=self.dbconfig)
+            logger.info(f"Configured privileges for {self.db_user_name} in database {self.db_name}.")
 
-            # Log the success
-            logger.info(f"Succesfully created user {username}!")
+            # Success
+            logger.info(f"Granted permissions on {self.db_name} for user {self.db_user_name}.")
+            return True, None
+
 
         except Exception as e:
-            logger.error(f"Error occured while trying to create user {username} in vadafi database {e}")
+            logger.error(f"Error occured while trying to create database/(user/) with id {self.user_id} {e}")
+            
+            # Return error
+            return False, jsonify({
+                "error": "Error occured creating database",
+                "message": "Sorry, we could not create your database at this moment."
+            }), 400
 
 
 
@@ -131,7 +199,7 @@ class User:
         # Get the user_id
         result = execute_query(
            query,
-           params=(username, ),
+           params=(self.username, ),
            return_data=True,
            dbconfig=dbconfig
             )
@@ -142,25 +210,9 @@ class User:
 
 
 
-        # Get the dbconfig for the user database
-        # This will also be as the admin
-        user_dbconfig = get_admin_dbconfig(self.db_name)
-
-
-
-
-
-
-    def get_user_dbconfig(self):
+    def get_dbconfig(self):
         """
         Get the dbconfig of the user.
-
-        Args:
-            username (STR): User's username.
-            password (STR): User's password.
-
-        Returns:
-            dbconfig (dict)
         """    
      
         # Load the .env file into the environment variables

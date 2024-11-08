@@ -9,7 +9,7 @@ from dotenv import load_dotenv
  
 from modules.tools.authentication import authenticate_user
 from modules.tools.logger import vadafi_logger
-from modules.users import create_user
+from modules.user import User
 from modules.secrets import add_secret, fetch_secrets, reveal_secret
 
 logger = vadafi_logger()
@@ -56,7 +56,8 @@ def create_user_api():
     password = data['password']
     
     # Create user
-    result = create_user(username, password)
+    user = User(username, password)
+    user.create()
 
     # Check output for result
     return result
