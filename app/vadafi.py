@@ -56,8 +56,7 @@ def create_user_api():
     password = data['password']
     
     # Create user
-    user = User(username, password)
-    user.create()
+    user = User(username, password, create=True)
 
     # Check output for result
     return result

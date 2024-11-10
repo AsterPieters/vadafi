@@ -17,15 +17,21 @@ logger = vadafi_logger()
 class User:
     
     # Initialize the user
-    def __init__(self, username, master_password):
+    def __init__(self, username, master_password, create=False):
 
-        # Check user existence before fetching database
+        # Check user existence
         if user_exists(username):
             self.load_info(username, master_password)
         else:
-            # Create the new user
-            self.create_user(username, master_password)
-            self.create_database()
+            # Create new user
+            if create:
+                self.username = username
+                self.master_password = master_password
+                self.create_vadafi_user()
+            
+            else:
+                #TODO: handle wrong Username
+                pass
 
 
 
@@ -35,17 +41,20 @@ class User:
         """
         self.username = username
         self.master_password = master_password
-        self.user_id = self.get_id() 
+        self.user_id = self.get_id()
         self.db_name = f"db_{self.user_id}"
         self.db_user_name = f"user_{self.user_id}"
         self.dbconfig = self.get_dbconfig()
         
 
 
-    def create(self):
+    def create_vadafi_user(self):
+        """
+        Create user database and database user.
+        """
         
         # Create user and database
-        success, response = self.create_user(self.username, self.master_password)
+        success, response = self.create_user(dklfjklasdjflk;asdjflksdjfl;asdjflkasdjfklasdfjl;nvvvvhvhvhv ghjffhja;lakdjfklasdlfjdkasjflkdjf;asdjklveree
         if not success:
             return response
         success, response = self.create_database()
@@ -60,7 +69,7 @@ class User:
 
 
 
-    def create_user(self, username, master_password):
+    def create_user(self):
         """
         Create the user in the vadafi_user table and database.
         """
